@@ -33,38 +33,59 @@ import com.optivus.googlekeeplite.presentation.utils.ColorUtils
 @Composable
 fun NoteItem(
     note: Note,
-    onNoteClick: (Note) -> Unit,
-    onDeleteClick: (Note) -> Unit,
-    modifier: Modifier = Modifier
+    onNoteClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    noteStyle: com.optivus.googlekeeplite.presentation.settings.NoteStyle = com.optivus.googlekeeplite.presentation.settings.NoteStyle.DEFAULT
 ) {
     // Determine if we're in dark mode
     val isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f
 
-    // Get the correct color based on the note's color index and dark mode
-    val noteColor = ColorUtils
-        .getNoteColor(note.color, isDarkMode)
+    // Get the note color using ColorUtils to ensure consistency
+    val noteColor = ColorUtils.getNoteColor(note.color, isDarkMode)
 
-    // Determine text color based on background brightness
-    val textColor = if (isDarkMode) {
-        Color.White.copy(alpha = 0.87f)
-    } else {
+    // Determine appropriate text color based on background brightness
+    val textColor = if (noteColor.luminance() > 0.5f) {
         Color.Black.copy(alpha = 0.87f)
+    } else {
+        Color.White.copy(alpha = 0.87f)
+    }
+
+    // Apply different card styles based on noteStyle setting
+    val cardShape = when (noteStyle) {
+        com.optivus.googlekeeplite.presentation.settings.NoteStyle.ROUNDED -> MaterialTheme.shapes.extraLarge
+        com.optivus.googlekeeplite.presentation.settings.NoteStyle.MATERIAL -> MaterialTheme.shapes.large
+        com.optivus.googlekeeplite.presentation.settings.NoteStyle.MINIMAL -> MaterialTheme.shapes.small
+        else -> MaterialTheme.shapes.medium
+    }
+
+    val cardElevation = when (noteStyle) {
+        com.optivus.googlekeeplite.presentation.settings.NoteStyle.MATERIAL -> CardDefaults.cardElevation(defaultElevation = 4.dp)
+        com.optivus.googlekeeplite.presentation.settings.NoteStyle.ROUNDED -> CardDefaults.cardElevation(defaultElevation = 2.dp)
+        com.optivus.googlekeeplite.presentation.settings.NoteStyle.MINIMAL -> CardDefaults.cardElevation(defaultElevation = 0.dp)
+        else -> CardDefaults.cardElevation(defaultElevation = 1.dp)
+    }
+
+    val cardPadding = when (noteStyle) {
+        com.optivus.googlekeeplite.presentation.settings.NoteStyle.MINIMAL -> 8.dp
+        com.optivus.googlekeeplite.presentation.settings.NoteStyle.MATERIAL -> 16.dp
+        else -> 12.dp
     }
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .clickable { onNoteClick(note) }
-            .animateContentSize(),
+            .animateContentSize()
+            .clip(cardShape)
+            .clickable(onClick = onNoteClick),
         colors = CardDefaults.cardColors(
-            containerColor = noteColor,
-            contentColor = textColor
+            containerColor = noteColor
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        elevation = cardElevation,
+        shape = cardShape
     ) {
         Column(
-            modifier = Modifier.padding(12.dp)
+            modifier = Modifier.padding(cardPadding)
         ) {
             if (note.title.isNotBlank()) {
                 Text(
@@ -90,7 +111,7 @@ fun NoteItem(
             Box(
                 modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd
             ) {
-                IconButton(onClick = { onDeleteClick(note) }) {
+                IconButton(onClick = { onDeleteClick() }) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Delete Note",

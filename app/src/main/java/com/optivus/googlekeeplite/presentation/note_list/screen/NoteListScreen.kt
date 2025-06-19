@@ -56,6 +56,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,7 +76,7 @@ import com.optivus.googlekeeplite.presentation.note_list.UiEvent
 import com.optivus.googlekeeplite.presentation.note_list.viewmodel.NoteListViewModel
 import com.optivus.googlekeeplite.presentation.utils.ColorUtils
 import kotlinx.coroutines.launch
-
+import androidx.compose.foundation.isSystemInDarkTheme
 
 @OptIn(
     ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class
@@ -97,6 +98,16 @@ fun NoteListScreen(
     var searchQuery by remember { mutableStateOf("") }
     var isMenuExpanded by remember { mutableStateOf(false) }
 
+    // Get settings preferences
+    val settingsViewModel: com.optivus.googlekeeplite.presentation.settings.SettingsViewModel =
+        hiltViewModel()
+    val settingsState = settingsViewModel.settingsState.collectAsState().value
+
+    // Apply dark mode setting (no longer trying to access private theme properties)
+    val isDarkTheme = settingsState.darkModeEnabled || isSystemInDarkTheme()
+
+    // Determine if animations should be enabled
+    val enableAnimations = settingsState.enableAnimations
 
     // handle delete note events
     LaunchedEffect(key1 = true) {
@@ -135,235 +146,260 @@ fun NoteListScreen(
         )
     }
 
-    Scaffold(modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection), topBar = {
-        if (isSearchActive) {
-            Column {
-                SearchBar(
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it },
-                    onSearch = { searchQuery = it },
-                    active = true,
-                    onActiveChange = { isSearchActive = it },
-                    placeholder = { Text("Search notes") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Search, contentDescription = "Search Icon"
-                        )
-                    },
-                    trailingIcon = {
-                        IconButton(onClick = {
-                            searchQuery = ""
-                            viewModel.onEvent(NoteListEvent.OnClearSearch)
-                        }) {
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            if (isSearchActive) {
+                Column {
+                    SearchBar(
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        onSearch = { searchQuery = it },
+                        active = true,
+                        onActiveChange = { isSearchActive = it },
+                        placeholder = { Text("Search notes") },
+                        leadingIcon = {
                             Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Clear search"
+                                imageVector = Icons.Default.Search, contentDescription = "Search Icon"
                             )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Filter options in the expanded search area
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                searchQuery = ""
+                                viewModel.onEvent(NoteListEvent.OnClearSearch)
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Clear search"
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = "Filter by color",
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        // Color filter chips
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(4.dp)
-                        ) {
-                            // Add "All Colors" option
-                            item {
-                                FilterChip(
-                                    selected = state.filterByColor == null,
-                                    onClick = { viewModel.onEvent(NoteListEvent.OnFilterByColor(null)) },
-                                    label = { Text("All") },
-                                    leadingIcon = if (state.filterByColor == null) {
-                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                    } else null
-                                )
-                            }
-
-                            // Add color options
-                            items(ColorUtils.noteColors.size) { colorIndex ->
-                                val color = ColorUtils.noteColors[colorIndex]
-                                FilterChip(
-                                    selected = state.filterByColor == colorIndex,
-                                    onClick = { viewModel.onEvent(NoteListEvent.OnFilterByColor(colorIndex)) },
-                                    label = { Text("") },
-                                    leadingIcon = {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(24.dp)
-                                                .background(color, CircleShape)
-                                                .then(
-                                                    if (state.filterByColor == colorIndex) {
-                                                        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                                                    } else {
-                                                        Modifier
-                                                    }
-                                                )
-                                        )
-                                    }
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Sort options
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
+                        // Filter options in the expanded search area
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) {
                             Text(
-                                text = "Sort by date:",
-                                style = MaterialTheme.typography.labelLarge
+                                text = "Filter by color",
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.padding(bottom = 8.dp)
                             )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            FilterChip(
-                                selected = !state.sortByDateAscending,
-                                onClick = { viewModel.onEvent(NoteListEvent.OnToggleSortOrder(false)) },
-                                label = { Text("Newest first") }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            FilterChip(
-                                selected = state.sortByDateAscending,
-                                onClick = { viewModel.onEvent(NoteListEvent.OnToggleSortOrder(true)) },
-                                label = { Text("Oldest first") }
-                            )
-                        }
 
-                        // Clear filters button
-                        TextButton(
-                            onClick = { viewModel.onEvent(NoteListEvent.OnClearFilters) },
-                            modifier = Modifier.align(Alignment.End)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Clear filters"
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Clear filters")
-                        }
-
-                        Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-                        // Search results section
-                        Text(
-                            text = "Search results",
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        )
-
-                        // Loading indicator
-                        if (state.isLoading) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
+                            // Color filter chips
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(4.dp)
                             ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.dp
-                                )
-                            }
-                        }
+                                // Add "All Colors" option
+                                item {
+                                    FilterChip(
+                                        selected = state.filterByColor == null,
+                                        onClick = { viewModel.onEvent(NoteListEvent.OnFilterByColor(null)) },
+                                        label = { Text("All") },
+                                        leadingIcon = if (state.filterByColor == null) {
+                                            {
+                                                Icon(
+                                                    Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        } else null
+                                    )
+                                }
 
-                        // Search results
-                        if (state.notes.isNotEmpty() && !state.isLoading) {
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(320.dp)
-                            ) {
-                                items(
-                                    items = state.notes,
-                                    key = { it.id ?: it.hashCode() }
-                                ) { note ->
-                                    NoteItemCompact(
-                                        note = note,
-                                        onNoteClick = {
-                                            isSearchActive = false
-                                            onNavigateToEditNote(note.id ?: -1)
+                                // Add color options
+                                items(ColorUtils.noteColors.size) { colorIndex ->
+                                    val color = ColorUtils.noteColors[colorIndex]
+                                    FilterChip(
+                                        selected = state.filterByColor == colorIndex,
+                                        onClick = {
+                                            viewModel.onEvent(
+                                                NoteListEvent.OnFilterByColor(
+                                                    colorIndex
+                                                )
+                                            )
+                                        },
+                                        label = { Text("") },
+                                        leadingIcon = {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .background(color, CircleShape)
+                                                    .then(
+                                                        if (state.filterByColor == colorIndex) {
+                                                            Modifier.border(
+                                                                2.dp,
+                                                                MaterialTheme.colorScheme.primary,
+                                                                CircleShape
+                                                            )
+                                                        } else {
+                                                            Modifier
+                                                        }
+                                                    )
+                                            )
                                         }
                                     )
                                 }
                             }
-                        }
-                        // No search results message
-                        else if (!state.isLoading && state.searchQuery.isNotBlank()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 16.dp),
-                                contentAlignment = Alignment.Center
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Sort options
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "No notes found for '${state.searchQuery}'",
-                                    color = MaterialTheme.colorScheme.error
+                                    text = "Sort by date:",
+                                    style = MaterialTheme.typography.labelLarge
                                 )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                FilterChip(
+                                    selected = !state.sortByDateAscending,
+                                    onClick = { viewModel.onEvent(NoteListEvent.OnToggleSortOrder(false)) },
+                                    label = { Text("Newest first") }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                FilterChip(
+                                    selected = state.sortByDateAscending,
+                                    onClick = { viewModel.onEvent(NoteListEvent.OnToggleSortOrder(true)) },
+                                    label = { Text("Oldest first") }
+                                )
+                            }
+
+                            // Clear filters button
+                            TextButton(
+                                onClick = { viewModel.onEvent(NoteListEvent.OnClearFilters) },
+                                modifier = Modifier.align(Alignment.End)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Clear filters"
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Clear filters")
+                            }
+
+                            Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                            // Search results section
+                            Text(
+                                text = "Search results",
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+
+                            // Loading indicator
+                            if (state.isLoading) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                }
+                            }
+
+                            // Search results
+                            if (state.notes.isNotEmpty() && !state.isLoading) {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(320.dp)
+                                ) {
+                                    items(
+                                        items = state.notes,
+                                        key = { it.id ?: it.hashCode() }
+                                    ) { note ->
+                                        NoteItemCompact(
+                                            note = note,
+                                            onNoteClick = {
+                                                isSearchActive = false
+                                                onNavigateToEditNote(note.id ?: -1)
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            // No search results message
+                            else if (!state.isLoading && state.searchQuery.isNotBlank()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No notes found for '${state.searchQuery}'",
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
-        } else {
-            TopAppBar(
-                title = { Text("Google Keep Lite") },
-                scrollBehavior = scrollBehavior,
-                actions = {
-                    IconButton(onClick = {
-                        isSearchActive = true
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.Search, contentDescription = "Search"
-                        )
-                    }
-
-                    // Menu icon with anchored dropdown
-                    Box {
+            } else {
+                TopAppBar(
+                    title = { Text("Google Keep Lite") },
+                    scrollBehavior = scrollBehavior,
+                    actions = {
                         IconButton(onClick = {
-                            isMenuExpanded = true
+                            isSearchActive = true
                         }) {
                             Icon(
-                                imageVector = Icons.Default.MoreVert, contentDescription = "More options"
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search"
                             )
                         }
 
-                        // Settings menu anchored to the icon
-                        DropdownMenu(
-                            expanded = isMenuExpanded,
-                            onDismissRequest = { isMenuExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Settings") },
-                                onClick = {
-                                    isMenuExpanded = false
-                                    onNavigateToSettings()
-                                }
-                            )
+                        // Menu icon with anchored dropdown
+                        Box {
+                            IconButton(onClick = {
+                                isMenuExpanded = true
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "More options"
+                                )
+                            }
+
+                            // Settings menu anchored to the icon
+                            DropdownMenu(
+                                expanded = isMenuExpanded,
+                                onDismissRequest = { isMenuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Settings") },
+                                    onClick = {
+                                        isMenuExpanded = false
+                                        onNavigateToSettings()
+                                    }
+                                )
+                            }
                         }
                     }
-                })
+                )
+            }
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showAddNoteDialog = true }) {
+                Icon(
+                    imageVector = Icons.Default.Add, contentDescription = "Add Note"
+                )
+            }
+        },
+        snackbarHost = {
+            SnackbarHost(snackbarHostState)
         }
-    }, floatingActionButton = {
-        FloatingActionButton(
-            onClick = { showAddNoteDialog = true }) {
-            Icon(
-                imageVector = Icons.Default.Add, contentDescription = "Add Note"
-            )
-        }
-    }, snackbarHost = { SnackbarHost(snackbarHostState) }) { paddingValues ->
+    ) { paddingValues ->
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -411,17 +447,34 @@ fun NoteListScreen(
                 else -> {
                     AnimatedVisibility(
                         visible = true,
-                        enter = fadeIn(animationSpec = tween(durationMillis = 150)) +
-                               slideInVertically(
-                                  initialOffsetY = { it },
-                                  animationSpec = spring(
-                                      dampingRatio = Spring.DampingRatioMediumBouncy,
-                                      stiffness = Spring.StiffnessLow
-                                  )
-                               )
+                        // Only apply animations if they're enabled in settings
+                        enter = if (enableAnimations) {
+                            fadeIn(animationSpec = tween(durationMillis = 150)) +
+                                    slideInVertically(
+                                        initialOffsetY = { it },
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessLow
+                                        )
+                                    )
+                        } else {
+                            fadeIn(animationSpec = tween(durationMillis = 50))
+                        }
                     ) {
+                        // Apply grid layout based on settings
+                        val columns = when (settingsState.gridLayout) {
+                            com.optivus.googlekeeplite.presentation.settings.GridLayout.ONE_COLUMN ->
+                                StaggeredGridCells.Fixed(1)
+                            com.optivus.googlekeeplite.presentation.settings.GridLayout.TWO_COLUMNS ->
+                                StaggeredGridCells.Fixed(2)
+                            com.optivus.googlekeeplite.presentation.settings.GridLayout.THREE_COLUMNS ->
+                                StaggeredGridCells.Fixed(3)
+                            else ->
+                                StaggeredGridCells.Adaptive(minSize = 160.dp)
+                        }
+
                         LazyVerticalStaggeredGrid(
-                            columns = StaggeredGridCells.Adaptive(minSize = 160.dp),
+                            columns = columns,
                             state = gridState,
                             contentPadding = PaddingValues(12.dp),
                             verticalItemSpacing = 12.dp,
@@ -429,14 +482,16 @@ fun NoteListScreen(
                             modifier = Modifier.fillMaxSize()
                         ) {
                             items(
-                                items = state.notes, key = { it.id ?: it.hashCode() }) { note ->
+                                items = state.notes,
+                                key = { it.id ?: it.hashCode() }
+                            ) { note ->
                                 NoteItem(
                                     note = note,
                                     onNoteClick = { onNavigateToEditNote(note.id ?: -1) },
                                     onDeleteClick = {
                                         viewModel.onEvent(NoteListEvent.OnDeleteNote(note))
                                     },
-                                    // animateItemPlacement is handled by the modifier in Foundation
+                                    noteStyle = settingsState.noteStyle,
                                     modifier = Modifier
                                 )
                             }
