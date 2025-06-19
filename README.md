@@ -651,10 +651,4 @@ Please ensure:
 - Tests are added for new functionality
 - Documentation is updated as needed
 
-## License
-
-[Add your license information here]
-
----
-
 *This project was created as a demonstration of modern Android development practices with Jetpack Compose.*
